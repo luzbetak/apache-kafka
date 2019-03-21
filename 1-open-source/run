@@ -1,0 +1,139 @@
+#!/bin/bash
+#-------------------------------------------------------------------------------------------------------------------------#
+
+
+###########################################################################################################################
+case "$1" in
+
+#-------------------------------------------------------------------------------------------------------------------------#
+#   Install Confluent Kafka Framework 
+#-------------------------------------------------------------------------------------------------------------------------#
+install)
+
+    wget http://apache.claz.org/kafka/2.1.0/kafka_2.11-2.1.0.tgz
+    tar xzvf kafka_2.11-2.1.0.tgz -C /opt/ 
+    rm -f kafka_2.11-2.1.0.tgz
+
+    wget http://apache.claz.org/zookeeper/stable/zookeeper-3.4.13.tar.gz
+    tar xzvf zookeeper-3.4.13.tar.gz -C /opt/
+    rm -f zookeeper-3.4.13.tar.gz
+;;
+#-------------------------------------------------------------------------------------------------------------------------#
+#   Start Docker Kafka 
+#-------------------------------------------------------------------------------------------------------------------------#
+start)
+
+    echo "cd /opt/kafka_2.11-2.1.0/"
+    echo "bin/zookeeper-server-start.sh config/zookeeper.properties"
+    echo "bin/kafka-server-start.sh config/server.properties"
+
+;;
+
+#-------------------------------------------------------------------------------------------------------------------------#
+topic-list)
+
+    set -x
+    export ZOOKEEPER_IP=localhost
+    kafka-topics.sh --list --zookeeper ${ZOOKEEPER_IP}:2181
+    set +x
+;;
+#-------------------------------------------------------------------------------------------------------------------------#
+topic-describe)
+
+    set -x
+    export ZOOKEEPER_IP=localhost
+    kafka-topics.sh --describe --zookeeper ${ZOOKEEPER_IP}:2181 --topic ${2}
+    set +x
+;;
+#-------------------------------------------------------------------------------------------------------------------------#
+# bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 3 --partitions 1 --topic my-replicated-topic
+#-------------------------------------------------------------------------------------------------------------------------#
+topic-create)
+
+    set -x
+    export ZOOKEEPER_IP=localhost
+    kafka-topics.sh --create --zookeeper ${ZOOKEEPER_IP}:2181 --replication-factor 1 --partitions 1 --topic ${2}
+    set +x
+
+;;
+#-------------------------------------------------------------------------------------------------------------------------#
+producer)
+    # kafka-console-consumer --bootstrap-server 172.20.0.3:9092 --from-beginning --topic odd
+    export BROKER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${KAFKA_NAME})
+    docker exec -it ${KAFKA_NAME} bash -c "/usr/bin/kafka-console-producer --broker-list ${BROKER_IP}:2181 --topic ${2} ${3}"
+;;
+#-------------------------------------------------------------------------------------------------------------------------#
+consumer)
+    # kafka-console-consumer --bootstrap-server 172.20.0.3:9092 --from-beginning --topic odd
+    export BROKER_IP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${KAFKA_NAME})
+    docker exec -it ${KAFKA_NAME} bash -c "/usr/bin/kafka-console-consumer --bootstrap-server ${BROKER_IP}:2181 --topic ${2}"
+;;
+#-------------------------------------------------------------------------------------------------------------------------#
+# Stop all containers, delete all containers, images and volumes
+#-------------------------------------------------------------------------------------------------------------------------#
+delall)
+
+    echo "1/5 Stopping all containers"
+    docker stop $(docker ps -a -q)
+
+    echo "2/5 Removing all containers"
+    docker rm -f $(docker ps -a -q)
+
+    echo "3/5 Removing all images"
+    docker rmi -f $(docker images -q)
+
+    echo "4/5 Deleting All Volumes"
+    docker system prune --volumes
+
+    # echo "5/5"
+    # rm -fR cp-docker-images/
+
+;;
+
+#-----------------------------------------------------------------------------------------------------------#
+#   Start Docker Kafka 
+#-----------------------------------------------------------------------------------------------------------#
+ip)
+
+    # export CONTROL_CENTER=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' control-center)
+    # export BROKER=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' broker)
+    # export ZOOKEEPER=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' zookeeper)
+    # echo "+--------------------------------------------------+"
+    # echo "| Control Center: http://${CONTROL_CENTER}:9021     " 
+    # echo "+--------------------------------------------------+"
+    # echo "| BROKER      = $BROKER                             "
+    # echo "| ZOOKEEPER   = $ZOOKEEPER                          "  
+    # echo "+--------------------------------------------------+"
+    export CONTAINER=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${2})
+    echo $CONTAINER
+
+;;
+#-------------------------------------------------------------------------------------------------------------------------#
+#                                   Main Menu 
+#-------------------------------------------------------------------------------------------------------------------------#
+*)
+    echo; docker ps -a
+    echo "+------------------------------------------------------------------------------------------+"
+    echo "|  KAFKA_NAME                    =  ${KAFKA_NAME}    "
+    echo "|  ZOOKEEPER_NAME                =  ${ZOOKEEPER_NAME}"
+    echo "+------------------------------------------------------------------------------------------+"
+    echo "|  ./run install                 -- Install Confluent Kafka                                |"
+    echo "+------------------------------------------------------------------------------------------+"
+    echo "|  ./run topic-create test       -- Create <test> Kafka Topic                              |"
+    echo "|  ./run topic-list              -- List Kafka Topic                                       |"
+    echo "|  ./run topic-describe test     -- Describe <test> Kafka Topic                            |"
+    echo "+------------------------------------------------------------------------------------------+"
+    echo "|  ./run producer test           -- Write to <test> topic                                  |"
+    echo "|  ./run consumer test           -- Read from <test> topic                                 |"
+    echo "+------------------------------------------------------------------------------------------+"
+    echo "|  ./run delall                  -- Stop, Delete all containers and images                 |"
+    echo "|  ./run bash <container>        -- Go to Bash                                             |"
+    echo "|  ./run ip                      -- Get Docker IP Address                                  |"
+    echo "+------------------------------------------------------------------------------------------+"
+;;
+
+esac
+###########################################################################################################################
+
+exit 0
+
